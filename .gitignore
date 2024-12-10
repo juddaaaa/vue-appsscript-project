@@ -1,8 +1,8 @@
 node_modules
 
 # Apps Script files
-appsscript/*.html
-appsscript/*.json
+src/appsscript/*.html
+src/appsscript/*.json
 .clasp.json
 
 # Editor directories and files
