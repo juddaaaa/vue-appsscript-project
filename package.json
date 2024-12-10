@@ -1,0 +1,33 @@
+{
+  "name": "boilerplate-ts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "gbuild": "nodemon --watch ./src -e js,json,ts,vue --exec \"npm run build\"",
+    "gcreate": "clasp create --title vue-appsscript-project --type webapp --rootDir ./src/appsscript",
+    "glogin": "clasp login",
+    "gpull": "clasp pull",
+    "gpush": "clasp push",
+    "gwatch": "nodemon --watch ./src -e js,json,ts,vue --exec \"npm run build && clasp push --watch\""
+  },
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/google-apps-script": "^1.0.86",
+    "@types/node": "^22.10.1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "nodemon": "^3.1.7",
+    "prettier": "^1.19.1",
+    "prettierrc": "^0.0.0-5",
+    "sass": "^1.82.0",
+    "typescript": "~5.6.2",
+    "url": "^0.11.4",
+    "vite": "^6.0.1",
+    "vite-plugin-singlefile": "^2.1.0",
+    "vue-tsc": "^2.1.10"
+  }
+}
