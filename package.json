@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "gbuild": "nodemon --watch ./src -e js,json,ts,vue --exec \"npm run build\"",
-    "gcreate": "clasp create --title vue-appsscript-project --type webapp --rootDir ./src/appsscript",
+    "gcreate": "clasp create --title vue- --type webapp --rootDir ./src/appsscript",
     "glogin": "clasp login",
     "gpull": "clasp pull",
     "gpush": "clasp push",
