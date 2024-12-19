@@ -10,11 +10,6 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
-      { find: '@appsscript', replacement: fileURLToPath(new URL('./src/appsscript', import.meta.url)) },
-      { find: '@components', replacement: fileURLToPath(new URL('./src/components', import.meta.url)) },
-      { find: '@functions', replacement: fileURLToPath(new URL('./src/functions', import.meta.url)) },
-      { find: '@layouts', replacement: fileURLToPath(new URL('./src/layouts', import.meta.url)) },
-      { find: '@stores', replacement: fileURLToPath(new URL('./src/stores', import.meta.url)) }
     ],
     extensions: [ '.js', '.json', '.ts', '.vue' ]
   },

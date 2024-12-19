@@ -1,4 +1,4 @@
-export const request = (func: string, payload: string | undefined): Promise<string> => {
+export const request = (func: string, payload: any): Promise<string> => {
     return new Promise((resolve, reject) => {
         // @ts-ignore
         google.script.run

@@ -84,7 +84,7 @@ const toTypeString = (value) => objectToString.call(value);
 const toRawType = (value) => {
   return toTypeString(value).slice(8, -1);
 };
-const isPlainObject = (val) => toTypeString(val) === "[object Object]";
+const isPlainObject$1 = (val) => toTypeString(val) === "[object Object]";
 const isIntegerKey = (key) => isString(key) && key !== "NaN" && key[0] !== "-" && "" + parseInt(key, 10) === key;
 const isReservedProp = /* @__PURE__ */ makeMap(
   // the leading comma is intentional so empty string "" is also included
@@ -218,7 +218,7 @@ const replacer = (_key, val) => {
     };
   } else if (isSymbol(val)) {
     return stringifySymbol(val);
-  } else if (isObject(val) && !isArray(val) && !isPlainObject(val)) {
+  } else if (isObject(val) && !isArray(val) && !isPlainObject$1(val)) {
     return String(val);
   }
   return val;
@@ -341,8 +341,16 @@ class EffectScope {
     }
   }
 }
+function effectScope(detached) {
+  return new EffectScope(detached);
+}
 function getCurrentScope() {
   return activeEffectScope;
+}
+function onScopeDispose(fn, failSilently = false) {
+  if (activeEffectScope) {
+    activeEffectScope.cleanups.push(fn);
+  }
 }
 let activeSub;
 const pausedQueueEffects = /* @__PURE__ */ new WeakSet();
@@ -437,9 +445,9 @@ class ReactiveEffect {
 let batchDepth = 0;
 let batchedSub;
 let batchedComputed;
-function batch(sub, isComputed = false) {
+function batch(sub, isComputed2 = false) {
   sub.flags |= 8;
-  if (isComputed) {
+  if (isComputed2) {
     sub.next = batchedComputed;
     batchedComputed = sub;
     return;
@@ -795,6 +803,10 @@ function trigger(target, type, key, newValue, oldValue, oldTarget) {
     }
   }
   endBatch();
+}
+function getDepFromReactive(object, key) {
+  const depMap = targetMap.get(object);
+  return depMap && depMap.get(key);
 }
 function reactiveReadArray(array) {
   const raw = toRaw(array);
@@ -1482,6 +1494,58 @@ const shallowUnwrapHandlers = {
 function proxyRefs(objectWithRefs) {
   return isReactive(objectWithRefs) ? objectWithRefs : new Proxy(objectWithRefs, shallowUnwrapHandlers);
 }
+function toRefs(object) {
+  const ret = isArray(object) ? new Array(object.length) : {};
+  for (const key in object) {
+    ret[key] = propertyToRef(object, key);
+  }
+  return ret;
+}
+class ObjectRefImpl {
+  constructor(_object, _key, _defaultValue) {
+    this._object = _object;
+    this._key = _key;
+    this._defaultValue = _defaultValue;
+    this["__v_isRef"] = true;
+    this._value = void 0;
+  }
+  get value() {
+    const val = this._object[this._key];
+    return this._value = val === void 0 ? this._defaultValue : val;
+  }
+  set value(newVal) {
+    this._object[this._key] = newVal;
+  }
+  get dep() {
+    return getDepFromReactive(toRaw(this._object), this._key);
+  }
+}
+class GetterRefImpl {
+  constructor(_getter) {
+    this._getter = _getter;
+    this["__v_isRef"] = true;
+    this["__v_isReadonly"] = true;
+    this._value = void 0;
+  }
+  get value() {
+    return this._value = this._getter();
+  }
+}
+function toRef(source, key, defaultValue) {
+  if (isRef(source)) {
+    return source;
+  } else if (isFunction(source)) {
+    return new GetterRefImpl(source);
+  } else if (isObject(source) && arguments.length > 1) {
+    return propertyToRef(source, key, defaultValue);
+  } else {
+    return ref(source);
+  }
+}
+function propertyToRef(source, key, defaultValue) {
+  const val = source[key];
+  return isRef(val) ? val : new ObjectRefImpl(source, key, defaultValue);
+}
 class ComputedRefImpl {
   constructor(fn, setter, isSSR) {
     this.fn = fn;
@@ -1707,7 +1771,7 @@ function traverse(value, depth = Infinity, seen) {
     value.forEach((v) => {
       traverse(v, depth, seen);
     });
-  } else if (isPlainObject(value)) {
+  } else if (isPlainObject$1(value)) {
     for (const key in value) {
       traverse(value[key], depth, seen);
     }
@@ -2786,7 +2850,7 @@ function createAppAPI(render, hydrate) {
     const installedPlugins = /* @__PURE__ */ new WeakSet();
     const pluginCleanupFns = [];
     let isMounted = false;
-    const app = context.app = {
+    const app2 = context.app = {
       _uid: uid$1++,
       _component: rootComponent,
       _props: rootProps,
@@ -2803,12 +2867,12 @@ function createAppAPI(render, hydrate) {
         if (installedPlugins.has(plugin)) ;
         else if (plugin && isFunction(plugin.install)) {
           installedPlugins.add(plugin);
-          plugin.install(app, ...options);
+          plugin.install(app2, ...options);
         } else if (isFunction(plugin)) {
           installedPlugins.add(plugin);
-          plugin(app, ...options);
+          plugin(app2, ...options);
         } else ;
-        return app;
+        return app2;
       },
       mixin(mixin) {
         {
@@ -2816,25 +2880,25 @@ function createAppAPI(render, hydrate) {
             context.mixins.push(mixin);
           }
         }
-        return app;
+        return app2;
       },
       component(name, component) {
         if (!component) {
           return context.components[name];
         }
         context.components[name] = component;
-        return app;
+        return app2;
       },
       directive(name, directive) {
         if (!directive) {
           return context.directives[name];
         }
         context.directives[name] = directive;
-        return app;
+        return app2;
       },
       mount(rootContainer, isHydrate, namespace) {
         if (!isMounted) {
-          const vnode = app._ceVNode || createVNode(rootComponent, rootProps);
+          const vnode = app2._ceVNode || createVNode(rootComponent, rootProps);
           vnode.appContext = context;
           if (namespace === true) {
             namespace = "svg";
@@ -2847,8 +2911,8 @@ function createAppAPI(render, hydrate) {
             render(vnode, rootContainer, namespace);
           }
           isMounted = true;
-          app._container = rootContainer;
-          rootContainer.__vue_app__ = app;
+          app2._container = rootContainer;
+          rootContainer.__vue_app__ = app2;
           return getComponentPublicInstance(vnode.component);
         }
       },
@@ -2859,20 +2923,20 @@ function createAppAPI(render, hydrate) {
         if (isMounted) {
           callWithAsyncErrorHandling(
             pluginCleanupFns,
-            app._instance,
+            app2._instance,
             16
           );
-          render(null, app._container);
-          delete app._container.__vue_app__;
+          render(null, app2._container);
+          delete app2._container.__vue_app__;
         }
       },
       provide(key, value) {
         context.provides[key] = value;
-        return app;
+        return app2;
       },
       runWithContext(fn) {
         const lastApp = currentApp;
-        currentApp = app;
+        currentApp = app2;
         try {
           return fn();
         } finally {
@@ -2880,7 +2944,7 @@ function createAppAPI(render, hydrate) {
         }
       }
     };
-    return app;
+    return app2;
   };
 }
 let currentApp = null;
@@ -2905,6 +2969,9 @@ function inject(key, defaultValue, treatDefaultAsFactory = false) {
       return treatDefaultAsFactory && isFunction(defaultValue) ? defaultValue.call(instance && instance.proxy) : defaultValue;
     } else ;
   }
+}
+function hasInjectionContext() {
+  return !!(currentInstance || currentRenderingInstance || currentApp);
 }
 const internalObjectProto = {};
 const createInternalObject = () => Object.create(internalObjectProto);
@@ -6029,12 +6096,12 @@ function ensureRenderer() {
   return renderer || (renderer = createRenderer(rendererOptions));
 }
 const createApp = (...args) => {
-  const app = ensureRenderer().createApp(...args);
-  const { mount } = app;
-  app.mount = (containerOrSelector) => {
+  const app2 = ensureRenderer().createApp(...args);
+  const { mount } = app2;
+  app2.mount = (containerOrSelector) => {
     const container = normalizeContainer(containerOrSelector);
     if (!container) return;
-    const component = app._component;
+    const component = app2._component;
     if (!isFunction(component) && !component.render && !component.template) {
       component.template = container.innerHTML;
     }
@@ -6048,7 +6115,7 @@ const createApp = (...args) => {
     }
     return proxy;
   };
-  return app;
+  return app2;
 };
 function resolveRootNamespace(container) {
   if (container instanceof SVGElement) {
@@ -6065,6 +6132,376 @@ function normalizeContainer(container) {
   }
   return container;
 }
+var isVue2 = false;
+/*!
+ * pinia v2.3.0
+ * (c) 2024 Eduardo San Martin Morote
+ * @license MIT
+ */
+let activePinia;
+const setActivePinia = (pinia) => activePinia = pinia;
+const piniaSymbol = (
+  /* istanbul ignore next */
+  Symbol()
+);
+function isPlainObject(o) {
+  return o && typeof o === "object" && Object.prototype.toString.call(o) === "[object Object]" && typeof o.toJSON !== "function";
+}
+var MutationType;
+(function(MutationType2) {
+  MutationType2["direct"] = "direct";
+  MutationType2["patchObject"] = "patch object";
+  MutationType2["patchFunction"] = "patch function";
+})(MutationType || (MutationType = {}));
+function createPinia() {
+  const scope = effectScope(true);
+  const state = scope.run(() => ref({}));
+  let _p = [];
+  let toBeInstalled = [];
+  const pinia = markRaw({
+    install(app2) {
+      setActivePinia(pinia);
+      {
+        pinia._a = app2;
+        app2.provide(piniaSymbol, pinia);
+        app2.config.globalProperties.$pinia = pinia;
+        toBeInstalled.forEach((plugin) => _p.push(plugin));
+        toBeInstalled = [];
+      }
+    },
+    use(plugin) {
+      if (!this._a && !isVue2) {
+        toBeInstalled.push(plugin);
+      } else {
+        _p.push(plugin);
+      }
+      return this;
+    },
+    _p,
+    // it's actually undefined here
+    // @ts-expect-error
+    _a: null,
+    _e: scope,
+    _s: /* @__PURE__ */ new Map(),
+    state
+  });
+  return pinia;
+}
+const noop = () => {
+};
+function addSubscription(subscriptions, callback, detached, onCleanup = noop) {
+  subscriptions.push(callback);
+  const removeSubscription = () => {
+    const idx = subscriptions.indexOf(callback);
+    if (idx > -1) {
+      subscriptions.splice(idx, 1);
+      onCleanup();
+    }
+  };
+  if (!detached && getCurrentScope()) {
+    onScopeDispose(removeSubscription);
+  }
+  return removeSubscription;
+}
+function triggerSubscriptions(subscriptions, ...args) {
+  subscriptions.slice().forEach((callback) => {
+    callback(...args);
+  });
+}
+const fallbackRunWithContext = (fn) => fn();
+const ACTION_MARKER = Symbol();
+const ACTION_NAME = Symbol();
+function mergeReactiveObjects(target, patchToApply) {
+  if (target instanceof Map && patchToApply instanceof Map) {
+    patchToApply.forEach((value, key) => target.set(key, value));
+  } else if (target instanceof Set && patchToApply instanceof Set) {
+    patchToApply.forEach(target.add, target);
+  }
+  for (const key in patchToApply) {
+    if (!patchToApply.hasOwnProperty(key))
+      continue;
+    const subPatch = patchToApply[key];
+    const targetValue = target[key];
+    if (isPlainObject(targetValue) && isPlainObject(subPatch) && target.hasOwnProperty(key) && !isRef(subPatch) && !isReactive(subPatch)) {
+      target[key] = mergeReactiveObjects(targetValue, subPatch);
+    } else {
+      target[key] = subPatch;
+    }
+  }
+  return target;
+}
+const skipHydrateSymbol = (
+  /* istanbul ignore next */
+  Symbol()
+);
+function shouldHydrate(obj) {
+  return !isPlainObject(obj) || !obj.hasOwnProperty(skipHydrateSymbol);
+}
+const { assign } = Object;
+function isComputed(o) {
+  return !!(isRef(o) && o.effect);
+}
+function createOptionsStore(id, options, pinia, hot) {
+  const { state, actions, getters } = options;
+  const initialState = pinia.state.value[id];
+  let store;
+  function setup() {
+    if (!initialState && true) {
+      {
+        pinia.state.value[id] = state ? state() : {};
+      }
+    }
+    const localState = toRefs(pinia.state.value[id]);
+    return assign(localState, actions, Object.keys(getters || {}).reduce((computedGetters, name) => {
+      computedGetters[name] = markRaw(computed(() => {
+        setActivePinia(pinia);
+        const store2 = pinia._s.get(id);
+        return getters[name].call(store2, store2);
+      }));
+      return computedGetters;
+    }, {}));
+  }
+  store = createSetupStore(id, setup, options, pinia, hot, true);
+  return store;
+}
+function createSetupStore($id, setup, options = {}, pinia, hot, isOptionsStore) {
+  let scope;
+  const optionsForPlugin = assign({ actions: {} }, options);
+  const $subscribeOptions = { deep: true };
+  let isListening;
+  let isSyncListening;
+  let subscriptions = [];
+  let actionSubscriptions = [];
+  let debuggerEvents;
+  const initialState = pinia.state.value[$id];
+  if (!isOptionsStore && !initialState && true) {
+    {
+      pinia.state.value[$id] = {};
+    }
+  }
+  ref({});
+  let activeListener;
+  function $patch(partialStateOrMutator) {
+    let subscriptionMutation;
+    isListening = isSyncListening = false;
+    if (typeof partialStateOrMutator === "function") {
+      partialStateOrMutator(pinia.state.value[$id]);
+      subscriptionMutation = {
+        type: MutationType.patchFunction,
+        storeId: $id,
+        events: debuggerEvents
+      };
+    } else {
+      mergeReactiveObjects(pinia.state.value[$id], partialStateOrMutator);
+      subscriptionMutation = {
+        type: MutationType.patchObject,
+        payload: partialStateOrMutator,
+        storeId: $id,
+        events: debuggerEvents
+      };
+    }
+    const myListenerId = activeListener = Symbol();
+    nextTick().then(() => {
+      if (activeListener === myListenerId) {
+        isListening = true;
+      }
+    });
+    isSyncListening = true;
+    triggerSubscriptions(subscriptions, subscriptionMutation, pinia.state.value[$id]);
+  }
+  const $reset = isOptionsStore ? function $reset2() {
+    const { state } = options;
+    const newState = state ? state() : {};
+    this.$patch(($state) => {
+      assign($state, newState);
+    });
+  } : (
+    /* istanbul ignore next */
+    noop
+  );
+  function $dispose() {
+    scope.stop();
+    subscriptions = [];
+    actionSubscriptions = [];
+    pinia._s.delete($id);
+  }
+  const action = (fn, name = "") => {
+    if (ACTION_MARKER in fn) {
+      fn[ACTION_NAME] = name;
+      return fn;
+    }
+    const wrappedAction = function() {
+      setActivePinia(pinia);
+      const args = Array.from(arguments);
+      const afterCallbackList = [];
+      const onErrorCallbackList = [];
+      function after(callback) {
+        afterCallbackList.push(callback);
+      }
+      function onError(callback) {
+        onErrorCallbackList.push(callback);
+      }
+      triggerSubscriptions(actionSubscriptions, {
+        args,
+        name: wrappedAction[ACTION_NAME],
+        store,
+        after,
+        onError
+      });
+      let ret;
+      try {
+        ret = fn.apply(this && this.$id === $id ? this : store, args);
+      } catch (error) {
+        triggerSubscriptions(onErrorCallbackList, error);
+        throw error;
+      }
+      if (ret instanceof Promise) {
+        return ret.then((value) => {
+          triggerSubscriptions(afterCallbackList, value);
+          return value;
+        }).catch((error) => {
+          triggerSubscriptions(onErrorCallbackList, error);
+          return Promise.reject(error);
+        });
+      }
+      triggerSubscriptions(afterCallbackList, ret);
+      return ret;
+    };
+    wrappedAction[ACTION_MARKER] = true;
+    wrappedAction[ACTION_NAME] = name;
+    return wrappedAction;
+  };
+  const partialStore = {
+    _p: pinia,
+    // _s: scope,
+    $id,
+    $onAction: addSubscription.bind(null, actionSubscriptions),
+    $patch,
+    $reset,
+    $subscribe(callback, options2 = {}) {
+      const removeSubscription = addSubscription(subscriptions, callback, options2.detached, () => stopWatcher());
+      const stopWatcher = scope.run(() => watch(() => pinia.state.value[$id], (state) => {
+        if (options2.flush === "sync" ? isSyncListening : isListening) {
+          callback({
+            storeId: $id,
+            type: MutationType.direct,
+            events: debuggerEvents
+          }, state);
+        }
+      }, assign({}, $subscribeOptions, options2)));
+      return removeSubscription;
+    },
+    $dispose
+  };
+  const store = reactive(partialStore);
+  pinia._s.set($id, store);
+  const runWithContext = pinia._a && pinia._a.runWithContext || fallbackRunWithContext;
+  const setupStore = runWithContext(() => pinia._e.run(() => (scope = effectScope()).run(() => setup({ action }))));
+  for (const key in setupStore) {
+    const prop = setupStore[key];
+    if (isRef(prop) && !isComputed(prop) || isReactive(prop)) {
+      if (!isOptionsStore) {
+        if (initialState && shouldHydrate(prop)) {
+          if (isRef(prop)) {
+            prop.value = initialState[key];
+          } else {
+            mergeReactiveObjects(prop, initialState[key]);
+          }
+        }
+        {
+          pinia.state.value[$id][key] = prop;
+        }
+      }
+    } else if (typeof prop === "function") {
+      const actionValue = action(prop, key);
+      {
+        setupStore[key] = actionValue;
+      }
+      optionsForPlugin.actions[key] = prop;
+    } else ;
+  }
+  {
+    assign(store, setupStore);
+    assign(toRaw(store), setupStore);
+  }
+  Object.defineProperty(store, "$state", {
+    get: () => pinia.state.value[$id],
+    set: (state) => {
+      $patch(($state) => {
+        assign($state, state);
+      });
+    }
+  });
+  pinia._p.forEach((extender) => {
+    {
+      assign(store, scope.run(() => extender({
+        store,
+        app: pinia._a,
+        pinia,
+        options: optionsForPlugin
+      })));
+    }
+  });
+  if (initialState && isOptionsStore && options.hydrate) {
+    options.hydrate(store.$state, initialState);
+  }
+  isListening = true;
+  isSyncListening = true;
+  return store;
+}
+/*! #__NO_SIDE_EFFECTS__ */
+// @__NO_SIDE_EFFECTS__
+function defineStore(idOrOptions, setup, setupOptions) {
+  let id;
+  let options;
+  const isSetupStore = typeof setup === "function";
+  {
+    id = idOrOptions;
+    options = isSetupStore ? setupOptions : setup;
+  }
+  function useStore(pinia, hot) {
+    const hasContext = hasInjectionContext();
+    pinia = // in test mode, ignore the argument provided as we can always retrieve a
+    // pinia instance with getActivePinia()
+    pinia || (hasContext ? inject(piniaSymbol, null) : null);
+    if (pinia)
+      setActivePinia(pinia);
+    pinia = activePinia;
+    if (!pinia._s.has(id)) {
+      if (isSetupStore) {
+        createSetupStore(id, setup, options, pinia);
+      } else {
+        createOptionsStore(id, options, pinia);
+      }
+    }
+    const store = pinia._s.get(id);
+    return store;
+  }
+  useStore.$id = id;
+  return useStore;
+}
+function storeToRefs(store) {
+  {
+    const rawStore = toRaw(store);
+    const refs = {};
+    for (const key in rawStore) {
+      const value = rawStore[key];
+      if (value.effect) {
+        refs[key] = // ...
+        computed({
+          get: () => store[key],
+          set(value2) {
+            store[key] = value2;
+          }
+        });
+      } else if (isRef(value) || isReactive(value)) {
+        refs[key] = // ---
+        toRef(store, key);
+      }
+    }
+    return refs;
+  }
+}
 const request = (func, payload) => {
   return new Promise((resolve, reject) => {
     google.script.run.withSuccessHandler((response) => {
@@ -6074,23 +6511,69 @@ const request = (func, payload) => {
     })[func](payload);
   });
 };
+const useChangesStore = /* @__PURE__ */ defineStore("changes-store", () => {
+  const changes = ref();
+  const open = computed(() => changes.value.filter((row) => row.status === "Open"));
+  const pending = computed(() => changes.value.filter((row) => row.status === "Pending"));
+  const closed = computed(() => changes.value.filter((row) => row.status === "Closed"));
+  const refreshChanges = () => {
+    request("$read", void 0).then((response) => {
+      changes.value = JSON.parse(response);
+    }).catch(console.error);
+  };
+  const createChange = () => {
+    request("$create", void 0).then((response) => {
+      changes.value = [...changes.value, ...JSON.parse(response)];
+    }).catch(console.error);
+  };
+  const updateChange = (args) => {
+    console.log(args);
+    request("$update", args).then((response) => {
+      console.log(JSON.parse(response));
+    });
+  };
+  return {
+    /* STATE & GETTERS */
+    changes,
+    closed,
+    open,
+    pending,
+    /* ACTIONS */
+    createChange,
+    refreshChanges,
+    updateChange
+  };
+});
 const _sfc_main = /* @__PURE__ */ defineComponent({
   __name: "App",
   setup(__props) {
-    const msg = ref();
+    const changesStore = useChangesStore();
+    const { createChange, refreshChanges, updateChange } = changesStore;
+    const { closed, open, pending } = storeToRefs(changesStore);
     onMounted(() => {
-      request("helloWorld", void 0).then((response) => {
-        msg.value = JSON.parse(response).message;
-      });
+      updateChange({ mr_number: 6618, columns: { wip_check: true } });
+      refreshChanges();
     });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("h1", null, toDisplayString(msg.value), 1);
+      return openBlock(), createElementBlock(Fragment, null, [
+        createBaseVNode("button", {
+          onClick: _cache[0] || (_cache[0] = //@ts-ignore
+          (...args) => unref(createChange) && unref(createChange)(...args))
+        }, "Create Change"),
+        createBaseVNode("pre", null, [
+          _cache[1] || (_cache[1] = createTextVNode("		")),
+          createBaseVNode("code", null, "\n" + toDisplayString(unref(pending)) + "\n" + toDisplayString(unref(open)) + "\n" + toDisplayString(unref(closed)) + "\n		", 1),
+          _cache[2] || (_cache[2] = createTextVNode("\n	"))
+        ])
+      ], 64);
     };
   }
 });
-createApp(_sfc_main).mount("#app");</script>
+const app = createApp(_sfc_main);
+app.use(createPinia());
+app.mount("#app");</script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app"></div>
   </body>
 </html>

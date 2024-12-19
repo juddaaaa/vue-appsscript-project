@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
-import { request } from "@functions/request"
+import { onMounted } from "vue"
+import { storeToRefs } from "pinia"
+import { useChangesStore } from "@/stores/ChangesStore"
 
-const msg = ref()
+const changesStore = useChangesStore()
+const { createChange, refreshChanges, updateChange } = changesStore
+const { closed, open, pending } = storeToRefs(changesStore)
 
 onMounted(() => {
-	request("helloWorld", undefined).then((response: string) => {
-		msg.value = JSON.parse(response).message
-	})
+	updateChange({ mr_number: 6618, columns: { wip_check: true } })
+	refreshChanges()
 })
 </script>
 
 <template>
-	<h1>{{ msg }}</h1>
+	<button @click="createChange">Create Change</button>
+	<pre>
+		<code>
+{{ pending }}
+{{ open }}
+{{ closed }}
+		</code>
+	</pre>
 </template>
