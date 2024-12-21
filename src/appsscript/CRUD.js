@@ -1,26 +1,3 @@
-const CONFIG = {
-	spreadsheet: SpreadsheetApp.openById("1TqBdEHtXHOY9whpomMAaxTJvFgzYLqFITuGk5oMHyjY"),
-
-	get changesSheet() {
-		const sheet = this.spreadsheet.getSheetByName("Changes")
-		const lastColumn = sheet.getLastColumn()
-		const lastRow = sheet.getLastRow()
-		const nextRow = lastRow + 1
-		const table = sheet.getDataRange().getValues()
-		const [headers, ...data] = table
-
-		return {
-			data,
-			headers,
-			lastColumn,
-			lastRow,
-			nextRow,
-			sheet,
-			table
-		}
-	}
-}
-
 /**
  * Triggered on the GET request from the web.
  *
@@ -206,7 +183,7 @@ function $delete({ mr_number }) {
 	lock.waitLock(30000)
 
 	// Retrieve the existing record and set deleted date.
-	const [record] = $read(({ mr_number: mr }) => mr === mr_number)
+	const [record] = JSON.parse($read(({ mr_number: mr }) => mr === mr_number))
 
 	// Throw an error if the record couldn't be found.
 	if (!record) throw new Error(`There are no records with MR number ${mr_number}`)

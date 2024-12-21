@@ -5,7 +5,7 @@ import { MR } from "@/types"
 
 export const useChangesStore = defineStore("changes-store", () => {
   /* STATE */
-  const changes = ref()
+  const changes = ref<MR[]>([])
 
   /* GETTERS */
   const open = computed(() => changes.value.filter((row: MR) => row.status === "Open"))
@@ -30,11 +30,31 @@ export const useChangesStore = defineStore("changes-store", () => {
   }
 
   const updateChange = (args: object): void => {
-    console.log(args)
     request("$update", args)
       .then(response => {
-        console.log(JSON.parse(response))
+        const [ updated ] = JSON.parse(response)
+        const changesCopy = [ ...changes.value ]
+
+        const changeRow = changesCopy.findIndex(({ mr_number }) => mr_number === updated.mr_number)
+        changesCopy[changeRow] = updated
+
+        changes.value = changesCopy
       })
+      .catch(console.error)
+  }
+
+  const deleteChange = (args: object) => {
+    request("$delete", args)
+      .then(response => {
+        const [ deleted ] = JSON.parse(response)
+        const changesCopy = [ ...changes.value ]
+
+        const changeRow = changesCopy.findIndex(({ mr_number }) => mr_number === deleted.mr_number)
+        changesCopy.splice(changeRow, 1)
+
+        changes.value = changesCopy
+      })
+      .catch(console.error)
   }
 
   return {
@@ -46,6 +66,7 @@ export const useChangesStore = defineStore("changes-store", () => {
 
     /* ACTIONS */
     createChange,
+    deleteChange,
     refreshChanges,
     updateChange
   }
